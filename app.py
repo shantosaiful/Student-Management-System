@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import hmac
 
 st.set_page_config(
     page_title="Student Management System",
@@ -8,7 +9,11 @@ st.set_page_config(
     layout="centered"
 )
 
-conn = sqlite3.connect("students.db", check_same_thread=False)
+# Database
+conn = sqlite3.connect(
+    "students.db",
+    check_same_thread=False
+)
 cursor = conn.cursor()
 
 cursor.execute("""
@@ -22,41 +27,94 @@ CREATE TABLE IF NOT EXISTS students (
 """)
 conn.commit()
 
+# Admin password
+try:
+    ADMIN_PASSWORD = st.secrets["auth"]["admin_password"]
+except Exception:
+    ADMIN_PASSWORD = None
+
+# Login session
+if "admin_logged_in" not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+# Sidebar login
+st.sidebar.title("Admin Login")
+
+if st.session_state.admin_logged_in:
+    st.sidebar.success("Admin Logged In")
+
+    if st.sidebar.button("Logout"):
+        st.session_state.admin_logged_in = False
+        st.rerun()
+
+else:
+    with st.sidebar.form("login_form"):
+        password = st.text_input(
+            "Enter Admin Password",
+            type="password"
+        )
+        login = st.form_submit_button("Login")
+
+        if login:
+            if ADMIN_PASSWORD and hmac.compare_digest(
+                password, ADMIN_PASSWORD
+            ):
+                st.session_state.admin_logged_in = True
+                st.rerun()
+            else:
+                st.error("Incorrect Password")
+
+# Main website
 st.title("🎓 Student Management System")
 st.write("Manage Your Student Information")
 
-tab1, tab2, tab3 = st.tabs([
-    "Add Student",
-    "View Students",
-    "Search Student"
-])
+is_admin = st.session_state.admin_logged_in
 
-with tab1:
-    st.subheader("Add New Student")
+# Tabs
+if is_admin:
+    tab1, tab2, tab3 = st.tabs([
+        "Add Student",
+        "View Students",
+        "Search Student"
+    ])
+else:
+    tab2, tab3 = st.tabs([
+        "View Students",
+        "Search Student"
+    ])
 
-    with st.form("add_form"):
-        name = st.text_input("Student Name")
-        roll = st.text_input("Roll Number")
-        age = st.text_input("Age")
-        department = st.text_input("Department")
-        semester = st.text_input("Semester")
+# Add Student: Admin only
+if is_admin:
+    with tab1:
+        st.subheader("Add New Student")
 
-        submit = st.form_submit_button("Add Student")
+        with st.form("add_form"):
+            name = st.text_input("Student Name")
+            roll = st.text_input("Roll Number")
+            age = st.text_input("Age")
+            department = st.text_input("Department")
+            semester = st.text_input("Semester")
 
-        if submit:
-            if name and roll and age and department and semester:
-                try:
-                    cursor.execute(
-                        "INSERT INTO students VALUES (?, ?, ?, ?, ?)",
-                        (name, roll, age, department, semester)
-                    )
-                    conn.commit()
-                    st.success("Student Added Successfully!")
-                except sqlite3.IntegrityError:
-                    st.error("This Roll Number Already Exists!")
-            else:
-                st.warning("Please Fill All Information")
+            submit = st.form_submit_button("Add Student")
 
+            if submit:
+                if all([
+                    name, roll, age,
+                    department, semester
+                ]):
+                    try:
+                        cursor.execute(
+                            "INSERT INTO students VALUES (?, ?, ?, ?, ?)",
+                            (name, roll, age, department, semester)
+                        )
+                        conn.commit()
+                        st.success("Student Added Successfully!")
+                    except sqlite3.IntegrityError:
+                        st.error("This Roll Number Already Exists!")
+                else:
+                    st.warning("Please Fill All Information")
+
+# View Students: Everyone
 with tab2:
     st.subheader("All Students")
 
@@ -66,13 +124,17 @@ with tab2:
     if data:
         df = pd.DataFrame(
             data,
-            columns=["Name", "Roll", "Age", "Department", "Semester"]
+            columns=[
+                "Name", "Roll", "Age",
+                "Department", "Semester"
+            ]
         )
         st.dataframe(df, use_container_width=True)
         st.success(f"Total Students: {len(data)}")
     else:
         st.info("No Student Found")
 
+# Search Student: Everyone
 with tab3:
     st.subheader("Search Student")
 
