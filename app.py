@@ -13,6 +13,8 @@ conn = sqlite3.connect("students.db", check_same_thread=False)
 cursor = conn.cursor()
 
 cursor.execute("""
+# Create and update database table
+cursor.execute("""
 CREATE TABLE IF NOT EXISTS students (
     name TEXT,
     roll TEXT UNIQUE,
@@ -22,6 +24,29 @@ CREATE TABLE IF NOT EXISTS students (
     result TEXT
 )
 """)
+
+# Check existing columns
+cursor.execute("PRAGMA table_info(students)")
+existing_columns = [
+    column[1] for column in cursor.fetchall()
+]
+
+# Add missing columns automatically
+required_columns = {
+    "name": "TEXT",
+    "roll": "TEXT",
+    "department": "TEXT",
+    "semester": "TEXT",
+    "student_id": "TEXT",
+    "result": "TEXT"
+}
+
+for column, data_type in required_columns.items():
+    if column not in existing_columns:
+        cursor.execute(
+            f"ALTER TABLE students ADD COLUMN {column} {data_type}"
+        )
+
 conn.commit()
 
 # Admin password from Streamlit Secrets
