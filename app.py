@@ -9,11 +9,13 @@ st.set_page_config(
 )
 
 # Database
-conn = sqlite3.connect("students.db", check_same_thread=False)
+conn = sqlite3.connect(
+    "students.db",
+    check_same_thread=False
+)
 cursor = conn.cursor()
 
-cursor.execute("""
-# Create and update database table
+# Create table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS students (
     name TEXT,
@@ -27,11 +29,9 @@ CREATE TABLE IF NOT EXISTS students (
 
 # Check existing columns
 cursor.execute("PRAGMA table_info(students)")
-existing_columns = [
-    column[1] for column in cursor.fetchall()
-]
+existing_columns = [row[1] for row in cursor.fetchall()]
 
-# Add missing columns automatically
+# Add missing columns
 required_columns = {
     "name": "TEXT",
     "roll": "TEXT",
@@ -49,7 +49,7 @@ for column, data_type in required_columns.items():
 
 conn.commit()
 
-# Admin password from Streamlit Secrets
+# Admin password
 try:
     ADMIN_PASSWORD = st.secrets["auth"]["admin_password"]
 except Exception:
@@ -61,26 +61,26 @@ st.title("🎓 Student Management System")
 if "admin" not in st.session_state:
     st.session_state.admin = False
 
-if ADMIN_PASSWORD is None:
-    st.error("Admin password সেট করা হয়নি। Streamlit Secrets-এ সেট করো।")
-else:
-    with st.sidebar:
-        st.header("Admin Login")
+with st.sidebar:
+    st.header("Admin Login")
 
-        if not st.session_state.admin:
-            password = st.text_input("Password", type="password")
+    if ADMIN_PASSWORD is None:
+        st.error("Admin password সেট করা হয়নি।")
+    elif not st.session_state.admin:
+        password = st.text_input("Password", type="password")
 
-            if st.button("Login"):
-                if password == ADMIN_PASSWORD:
-                    st.session_state.admin = True
-                    st.rerun()
-                else:
-                    st.error("Wrong Password")
-        else:
-            st.success("Admin Logged In")
-            if st.button("Logout"):
-                st.session_state.admin = False
+        if st.button("Login"):
+            if password == ADMIN_PASSWORD:
+                st.session_state.admin = True
                 st.rerun()
+            else:
+                st.error("Wrong Password")
+    else:
+        st.success("Admin Logged In")
+
+        if st.button("Logout"):
+            st.session_state.admin = False
+            st.rerun()
 
 # Tabs
 if st.session_state.admin:
@@ -96,7 +96,7 @@ else:
         "Search Student"
     ])
 
-# Add Student - Admin only
+# Add Student
 if st.session_state.admin:
     with tab1:
         st.subheader("Add New Student")
@@ -121,20 +121,24 @@ if st.session_state.admin:
                 else:
                     try:
                         cursor.execute("""
-                        INSERT INTO students
-                        (name, roll, department, semester, student_id, result)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                            INSERT INTO students
+                            (name, roll, department, semester,
+                             student_id, result)
+                            VALUES (?, ?, ?, ?, ?, ?)
                         """, (
-                            name.strip(), roll.strip(),
-                            department.strip(), semester.strip(),
-                            student_id.strip(), result.strip()
+                            name.strip(),
+                            roll.strip(),
+                            department.strip(),
+                            semester.strip(),
+                            student_id.strip(),
+                            result.strip()
                         ))
                         conn.commit()
                         st.success("Student added successfully!")
                     except sqlite3.IntegrityError:
                         st.error("এই Roll অথবা Student ID আগে থেকেই আছে।")
 
-# View Students - Everyone
+# View Students
 with tab2:
     st.subheader("All Students")
 
@@ -152,7 +156,7 @@ with tab2:
     st.write("Total Students:", len(df))
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-# Search Student - Everyone
+# Search Student
 with tab3:
     st.subheader("Search Student")
 
@@ -182,7 +186,7 @@ with tab3:
         else:
             st.warning("কোনো Student পাওয়া যায়নি।")
 
-# Delete Student - Admin only
+# Delete Student
 if st.session_state.admin:
     with tab4:
         st.subheader("Delete Student")
