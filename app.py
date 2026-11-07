@@ -3,7 +3,7 @@ import sqlite3
 import pandas as pd
 
 st.set_page_config(
-    page_title="Student Management System",
+    page_title="Student Management System (CCN PI)",
     page_icon="🎓",
     layout="wide"
 )
@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS students (
 cursor.execute("PRAGMA table_info(students)")
 existing_columns = [row[1] for row in cursor.fetchall()]
 
-# Add missing columns
 required_columns = {
     "name": "TEXT",
     "roll": "TEXT",
@@ -49,15 +48,16 @@ for column, data_type in required_columns.items():
 
 conn.commit()
 
-# Admin password
+# Admin Password
 try:
     ADMIN_PASSWORD = st.secrets["auth"]["admin_password"]
 except Exception:
     ADMIN_PASSWORD = None
 
-st.title("🎓 Student Management System")
+# Website Title
+st.title("🎓 Student Management System (CCN PI)")
 
-# Admin login
+# Admin Login
 if "admin" not in st.session_state:
     st.session_state.admin = False
 
@@ -66,8 +66,13 @@ with st.sidebar:
 
     if ADMIN_PASSWORD is None:
         st.error("Admin password সেট করা হয়নি।")
+
     elif not st.session_state.admin:
-        password = st.text_input("Password", type="password")
+
+        password = st.text_input(
+            "Password",
+            type="password"
+        )
 
         if st.button("Login"):
             if password == ADMIN_PASSWORD:
@@ -75,6 +80,7 @@ with st.sidebar:
                 st.rerun()
             else:
                 st.error("Wrong Password")
+
     else:
         st.success("Admin Logged In")
 
@@ -82,26 +88,35 @@ with st.sidebar:
             st.session_state.admin = False
             st.rerun()
 
+
 # Tabs
 if st.session_state.admin:
-    tab1, tab2, tab3, tab4 = st.tabs([
+
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Add Student",
         "View Students",
         "Search Student",
+        "Edit Student",
         "Delete Student"
     ])
+
 else:
+
     tab2, tab3 = st.tabs([
         "View Students",
         "Search Student"
     ])
 
+
 # Add Student
 if st.session_state.admin:
+
     with tab1:
+
         st.subheader("Add New Student")
 
         with st.form("add_student_form"):
+
             name = st.text_input("Student Name")
             roll = st.text_input("Roll")
             department = st.text_input("Department")
@@ -112,14 +127,20 @@ if st.session_state.admin:
             submitted = st.form_submit_button("Add Student")
 
             if submitted:
+
                 if not all([
-                    name.strip(), roll.strip(),
-                    department.strip(), semester.strip(),
-                    student_id.strip(), result.strip()
+                    name.strip(),
+                    roll.strip(),
+                    department.strip(),
+                    semester.strip(),
+                    student_id.strip(),
+                    result.strip()
                 ]):
                     st.warning("সব তথ্য পূরণ করো।")
+
                 else:
                     try:
+
                         cursor.execute("""
                             INSERT INTO students
                             (name, roll, department, semester,
@@ -133,43 +154,63 @@ if st.session_state.admin:
                             student_id.strip(),
                             result.strip()
                         ))
+
                         conn.commit()
+
                         st.success("Student added successfully!")
+
                     except sqlite3.IntegrityError:
-                        st.error("এই Roll অথবা Student ID আগে থেকেই আছে।")
+
+                        st.error(
+                            "এই Roll অথবা Student ID আগে থেকেই আছে।"
+                        )
+
 
 # View Students
 with tab2:
+
     st.subheader("All Students")
 
     df = pd.read_sql_query("""
-        SELECT name AS Name,
-               roll AS Roll,
-               department AS Department,
-               semester AS Semester,
-               student_id AS ID,
-               result AS Result
+        SELECT
+            name AS Name,
+            roll AS Roll,
+            department AS Department,
+            semester AS Semester,
+            student_id AS ID,
+            result AS Result
         FROM students
         ORDER BY roll
     """, conn)
 
     st.write("Total Students:", len(df))
-    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True
+    )
+
 
 # Search Student
 with tab3:
+
     st.subheader("Search Student")
 
-    search_value = st.text_input("Enter Roll or Student ID")
+    search_value = st.text_input(
+        "Enter Roll or Student ID"
+    )
 
     if search_value.strip():
+
         result_df = pd.read_sql_query("""
-            SELECT name AS Name,
-                   roll AS Roll,
-                   department AS Department,
-                   semester AS Semester,
-                   student_id AS ID,
-                   result AS Result
+            SELECT
+                name AS Name,
+                roll AS Roll,
+                department AS Department,
+                semester AS Semester,
+                student_id AS ID,
+                result AS Result
             FROM students
             WHERE roll = ? OR student_id = ?
         """, conn, params=(
@@ -178,17 +219,143 @@ with tab3:
         ))
 
         if not result_df.empty:
+
             st.dataframe(
                 result_df,
                 use_container_width=True,
                 hide_index=True
             )
+
         else:
+
             st.warning("কোনো Student পাওয়া যায়নি।")
 
-# Delete Student
+
+# Edit Student (Admin Only)
 if st.session_state.admin:
+
     with tab4:
+
+        st.subheader("Edit Student Information")
+
+        edit_value = st.text_input(
+            "Enter Student Roll or ID",
+            key="edit_student_search"
+        )
+
+        if edit_value.strip():
+
+            student = cursor.execute("""
+                SELECT name, roll, department,
+                       semester, student_id, result
+                FROM students
+                WHERE roll = ? OR student_id = ?
+            """, (
+                edit_value.strip(),
+                edit_value.strip()
+            )).fetchone()
+
+            if student:
+
+                st.success("Student Found!")
+
+                with st.form("edit_student_form"):
+
+                    new_name = st.text_input(
+                        "Student Name",
+                        value=student[0] or ""
+                    )
+
+                    new_roll = st.text_input(
+                        "Roll",
+                        value=student[1] or ""
+                    )
+
+                    new_department = st.text_input(
+                        "Department",
+                        value=student[2] or ""
+                    )
+
+                    new_semester = st.text_input(
+                        "Semester",
+                        value=student[3] or ""
+                    )
+
+                    new_id = st.text_input(
+                        "Student ID",
+                        value=student[4] or ""
+                    )
+
+                    new_result = st.text_input(
+                        "Result",
+                        value=student[5] or ""
+                    )
+
+                    update = st.form_submit_button(
+                        "Update Student"
+                    )
+
+                    if update:
+
+                        if not all([
+                            new_name.strip(),
+                            new_roll.strip(),
+                            new_department.strip(),
+                            new_semester.strip(),
+                            new_id.strip(),
+                            new_result.strip()
+                        ]):
+
+                            st.warning("সব তথ্য পূরণ করো।")
+
+                        else:
+
+                            try:
+
+                                cursor.execute("""
+                                    UPDATE students
+                                    SET
+                                        name = ?,
+                                        roll = ?,
+                                        department = ?,
+                                        semester = ?,
+                                        student_id = ?,
+                                        result = ?
+                                    WHERE roll = ?
+                                """, (
+                                    new_name.strip(),
+                                    new_roll.strip(),
+                                    new_department.strip(),
+                                    new_semester.strip(),
+                                    new_id.strip(),
+                                    new_result.strip(),
+                                    student[1]
+                                ))
+
+                                conn.commit()
+
+                                st.success(
+                                    "Student updated successfully!"
+                                )
+
+                            except sqlite3.IntegrityError:
+
+                                st.error(
+                                    "এই Roll অথবা Student ID অন্য Student ব্যবহার করছে।"
+                                )
+
+            else:
+
+                st.warning(
+                    "এই Roll অথবা ID-এর কোনো Student পাওয়া যায়নি।"
+                )
+
+
+# Delete Student (Admin Only)
+if st.session_state.admin:
+
+    with tab5:
+
         st.subheader("Delete Student")
 
         delete_value = st.text_input(
@@ -196,13 +363,15 @@ if st.session_state.admin:
         )
 
         if delete_value.strip():
+
             student_df = pd.read_sql_query("""
-                SELECT name AS Name,
-                       roll AS Roll,
-                       department AS Department,
-                       semester AS Semester,
-                       student_id AS ID,
-                       result AS Result
+                SELECT
+                    name AS Name,
+                    roll AS Roll,
+                    department AS Department,
+                    semester AS Semester,
+                    student_id AS ID,
+                    result AS Result
                 FROM students
                 WHERE roll = ? OR student_id = ?
             """, conn, params=(
@@ -211,6 +380,7 @@ if st.session_state.admin:
             ))
 
             if not student_df.empty:
+
                 st.dataframe(
                     student_df,
                     use_container_width=True,
@@ -222,7 +392,9 @@ if st.session_state.admin:
                 )
 
                 if st.button("Delete Student"):
+
                     if confirm:
+
                         cursor.execute("""
                             DELETE FROM students
                             WHERE roll = ? OR student_id = ?
@@ -230,12 +402,26 @@ if st.session_state.admin:
                             delete_value.strip(),
                             delete_value.strip()
                         ))
+
                         conn.commit()
-                        st.success("Student deleted successfully!")
+
+                        st.success(
+                            "Student deleted successfully!"
+                        )
+
                         st.rerun()
+
                     else:
-                        st.warning("আগে নিশ্চিত হওয়ার ঘরে টিক দাও।")
+
+                        st.warning(
+                            "আগে নিশ্চিত হওয়ার ঘরে টিক দাও।"
+                        )
+
             else:
-                st.warning("এই Roll বা ID-এর কোনো Student পাওয়া যায়নি।")
+
+                st.warning(
+                    "এই Roll বা ID-এর কোনো Student পাওয়া যায়নি।"
+                )
+
 
 conn.close()
