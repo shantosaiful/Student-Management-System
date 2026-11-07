@@ -1,4 +1,3 @@
-
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -8,13 +7,14 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 
+# Page Settings
 st.set_page_config(
     page_title="Student Information & Management System (CCN PI)",
     page_icon="🎓",
     layout="wide"
 )
 
-# Database
+# Database Connection
 conn = sqlite3.connect(
     "students.db",
     check_same_thread=False
@@ -22,7 +22,7 @@ conn = sqlite3.connect(
 
 cursor = conn.cursor()
 
-# Create Table
+# Create Database Table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS students (
     name TEXT,
@@ -33,25 +33,6 @@ CREATE TABLE IF NOT EXISTS students (
     result TEXT
 )
 """)
-
-# Check Existing Columns
-cursor.execute("PRAGMA table_info(students)")
-existing_columns = [row[1] for row in cursor.fetchall()]
-
-required_columns = {
-    "name": "TEXT",
-    "roll": "TEXT",
-    "department": "TEXT",
-    "semester": "TEXT",
-    "student_id": "TEXT",
-    "result": "TEXT"
-}
-
-for column, data_type in required_columns.items():
-    if column not in existing_columns:
-        cursor.execute(
-            f"ALTER TABLE students ADD COLUMN {column} {data_type}"
-        )
 
 conn.commit()
 
@@ -64,7 +45,7 @@ except Exception:
 
 # Website Title
 st.title("🎓 Student Information & Management System (CCN PI)")
-st.caption("Student Information Management Portal")
+st.caption("CCN PI | Student Information Portal")
 
 # Admin Session
 if "admin" not in st.session_state:
@@ -83,32 +64,28 @@ with st.sidebar:
     elif not st.session_state.admin:
 
         password = st.text_input(
-            "Password",
+            "Enter Password",
             type="password"
         )
 
         if st.button("Login", use_container_width=True):
 
             if password == ADMIN_PASSWORD:
-
                 st.session_state.admin = True
                 st.rerun()
-
             else:
-
-                st.error("Wrong Password")
+                st.error("Wrong Password!")
 
     else:
 
         st.success("Admin Logged In")
 
         if st.button("Logout", use_container_width=True):
-
             st.session_state.admin = False
             st.rerun()
 
 
-# Get Student Data
+# Student Data Function
 def get_students():
 
     return pd.read_sql_query("""
@@ -124,7 +101,7 @@ def get_students():
     """, conn)
 
 
-# Excel Download
+# Excel Function
 def create_excel(df):
 
     output = io.BytesIO()
@@ -143,7 +120,7 @@ def create_excel(df):
     return output.getvalue()
 
 
-# PDF Download
+# PDF Function
 def create_pdf(df):
 
     output = io.BytesIO()
@@ -153,16 +130,14 @@ def create_pdf(df):
         pagesize=landscape(A4)
     )
 
-    data = [
-        [
-            "Name",
-            "Roll",
-            "Department",
-            "Semester",
-            "Student ID",
-            "Result"
-        ]
-    ]
+    data = [[
+        "Name",
+        "Roll",
+        "Department",
+        "Semester",
+        "Student ID",
+        "Result"
+    ]]
 
     for _, row in df.iterrows():
 
@@ -178,13 +153,20 @@ def create_pdf(df):
     table = Table(data, repeatRows=1)
 
     table.setStyle(TableStyle([
+
         ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
+
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+
         ("GRID", (0, 0), (-1, -1), 1, colors.grey),
+
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+
         ("PADDING", (0, 0), (-1, -1), 8),
+
         ("ROWBACKGROUNDS", (0, 1), (-1, -1),
          [colors.white, colors.lightgrey])
+
     ]))
 
     document.build([table])
@@ -192,28 +174,35 @@ def create_pdf(df):
     return output.getvalue()
 
 
-# Tabs
+# Navigation Tabs
 if st.session_state.admin:
 
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+
         "📊 Dashboard",
         "➕ Add Student",
         "👥 View Students",
         "🔍 Search Student",
         "✏️ Edit Student",
         "🗑️ Delete Student"
+
     ])
 
 else:
 
     tab1, tab3, tab4 = st.tabs([
+
         "📊 Dashboard",
         "👥 View Students",
         "🔍 Search Student"
+
     ])
 
 
-# Dashboard
+# ==========================
+# DASHBOARD
+# ==========================
+
 with tab1:
 
     st.subheader("📊 Dashboard")
@@ -240,12 +229,12 @@ with tab1:
     )
 
     col2.metric(
-        "🏫 Departments",
+        "🏫 Total Departments",
         total_departments
     )
 
     col3.metric(
-        "📚 Semesters",
+        "📚 Total Semesters",
         total_semesters
     )
 
@@ -255,11 +244,11 @@ with tab1:
 
         st.subheader("Department Wise Students")
 
-        department_data = df["Department"].value_counts()
+        st.bar_chart(
+            df["Department"].value_counts()
+        )
 
-        st.bar_chart(department_data)
-
-        st.subheader("Recent Student Records")
+        st.subheader("Recent Students")
 
         st.dataframe(
             df.drop(columns=["Record"]).tail(5),
@@ -269,10 +258,13 @@ with tab1:
 
     else:
 
-        st.info("এখনো কোনো Student যোগ করা হয়নি।")
+        st.info("No students added yet.")
 
 
-# Add Student
+# ==========================
+# ADD STUDENT
+# ==========================
+
 if st.session_state.admin:
 
     with tab2:
@@ -340,7 +332,10 @@ if st.session_state.admin:
                         )
 
 
-# View Students
+# ==========================
+# VIEW STUDENTS
+# ==========================
+
 with tab3:
 
     st.subheader("👥 All Students")
@@ -382,7 +377,10 @@ with tab3:
             )
 
 
-# Advanced Search
+# ==========================
+# ADVANCED SEARCH
+# ==========================
+
 with tab4:
 
     st.subheader("🔍 Advanced Student Search")
@@ -454,7 +452,10 @@ with tab4:
     )
 
 
-# Edit Student
+# ==========================
+# EDIT STUDENT
+# ==========================
+
 if st.session_state.admin:
 
     with tab5:
@@ -467,14 +468,18 @@ if st.session_state.admin:
 
             selected_record = st.selectbox(
                 "Select Student",
+
                 df["Record"].tolist(),
+
                 format_func=lambda x: (
                     f"{df.loc[df['Record'] == x, 'Name'].iloc[0]} "
                     f"- Roll: {df.loc[df['Record'] == x, 'Roll'].iloc[0]}"
                 )
             )
 
-            student = df[df["Record"] == selected_record].iloc[0]
+            student = df[
+                df["Record"] == selected_record
+            ].iloc[0]
 
             with st.form("edit_student_form"):
 
@@ -532,12 +537,14 @@ if st.session_state.admin:
 
                             cursor.execute("""
                                 UPDATE students
+
                                 SET name = ?,
                                     roll = ?,
                                     department = ?,
                                     semester = ?,
                                     student_id = ?,
                                     result = ?
+
                                 WHERE rowid = ?
                             """, (
                                 edit_name.strip(),
@@ -568,7 +575,10 @@ if st.session_state.admin:
             st.info("কোনো Student পাওয়া যায়নি।")
 
 
-# Delete Student
+# ==========================
+# DELETE STUDENT
+# ==========================
+
 if st.session_state.admin:
 
     with tab6:
@@ -576,21 +586,24 @@ if st.session_state.admin:
         st.subheader("🗑️ Delete Student")
 
         delete_value = st.text_input(
-            "Student Roll অথবা ID লেখো",
-            key="delete_student_value"
+            "Student Roll অথবা ID লেখো"
         )
 
         if delete_value.strip():
 
             student_df = pd.read_sql_query("""
+
                 SELECT name AS Name,
                        roll AS Roll,
                        department AS Department,
                        semester AS Semester,
                        student_id AS ID,
                        result AS Result
+
                 FROM students
+
                 WHERE roll = ? OR student_id = ?
+
             """, conn, params=(
                 delete_value.strip(),
                 delete_value.strip()
@@ -637,9 +650,8 @@ if st.session_state.admin:
             else:
 
                 st.warning(
-                    "কোনো Student পাওয়া যায়নি।"
+                    "এই Roll অথবা ID-এর কোনো Student পাওয়া যায়নি।"
                 )
 
 
 conn.close()
-```
